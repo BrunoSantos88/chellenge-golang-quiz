@@ -1,0 +1,49 @@
+    - name: Criar usuário 'github' para o runner
+      user:
+        name: github
+        shell: /bin/bash
+        create_home: yes
+
+    - name: Baixar GitHub Actions Runner
+      become_user: github
+      shell: |
+        cd ~
+        curl -o actions-runner.tar.gz -L https://github.com/actions/runner/releases/latest/download/actions-runner-linux-x64-2.316.0.tar.gz
+        mkdir -p actions-runner && tar xzf actions-runner.tar.gz -C actions-runner
+      args:
+        executable: /bin/bash
+      environment:
+        HOME: /home/github
+
+    - name: Instalar dependências do runner
+      apt:
+        name:
+          - libicu72
+          - libssl3
+          - curl
+        state: present
+      when: ansible_os_family == "Debian"
+
+    - name: Registrar runner no GitHub
+      become_user: github
+      shell: |
+        cd ~/actions-runner
+        ./config.sh --url https://github.com/SEU-USUARIO/SEU-REPO \
+                    --token SEU_TOKEN \
+                    --unattended \
+                    --name runner-ansible
+      args:
+        executable: /bin/bash
+      environment:
+        HOME: /home/github
+
+    - name: Iniciar runner como serviço
+      become_user: github
+      shell: |
+        cd ~/actions-runner
+        sudo ./svc.sh install
+        sudo ./svc.sh start
+      args:
+        executable: /bin/bash
+      environment:
+        HOME: /home/github

@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="quiz.css">
+  <script src="quiz.js" async></script>
+  <title>Quiz JavaScript</title>
+</head>
+
+<!-- Container Quiz-->
+  <body>
+		<div id="container">
+			<header>
+				<h1 id="h1">Quiz Desafio</h1>
+			</header>
+			<hr style="margin-bottom: 70px;">
+
+<!-- Container Perguntas-->
+    <div class="questions-container hide">
+      <span id="question" class="question">Pergunta aqui?</span>
+      <div class="answers-container">
+        <button class="answer button" data-feedback="Essa esta correta.">Resposta 1</button>
+        <button class="answer button" data-feedback="Essa esta correta.">Resposta 2</button>
+        <button class="answer button" data-feedback="Essa está correta.">Resposta 3</button>
+        <button class="answer button" data-feedback="Essa está correta.">Resposta 4</button>
+      </div>
+    </div>
+    
+    <!-- Container Controlador Quiz-->
+    <div class="controls-container"> 
+      <button class="start-quiz button">Iniciar Quiz!</button>  <!-- botao de inicar -->
+      <button id="read-question" class="button hide">Ler Pergunta</button>
+      <button class="next-question button hide"> Próxima Pergunta!</button> <!-- botao proxima pergunta -->
+    </div>
+    <!-- mensagens termino do quiz -->
+    <div class="final-message hide">
+      <p>Fim de jogo! Gostaria de tentar mais uma vez?</p>
+      <button class="restart-button" onclick="restartQuiz()">Tentar Novamente</button>
+    </div>
+
+       <!-- info quiz -->
+			<hr style="margin-top: 100px;">  <!-- margen -->
+      <div class="feedback-message hide" id="feedbackMessage"> </div>
+			<footer>
+        <div class="progress-message hide" id="progressMessage">Quiz 1/5 </div>
+        <div class="score-message hide" id="scoreMessage">QuizPoints:<div>
+      </footer>
+
+  </div>
+</body>
+</html>
