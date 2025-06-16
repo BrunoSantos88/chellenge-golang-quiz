@@ -1,49 +1,88 @@
-    - name: Criar usuário 'github' para o runner
-      user:
-        name: github
-        shell: /bin/bash
-        create_home: yes
+---
+- name: Instalar NGINX, fazer deploy da pasta web e configurar GitHub Actions Runner
+  hosts: webservers
+  become: true
 
-    - name: Baixar GitHub Actions Runner
-      become_user: github
-      shell: |
-        cd ~
-        curl -o actions-runner.tar.gz -L https://github.com/actions/runner/releases/latest/download/actions-runner-linux-x64-2.316.0.tar.gz
-        mkdir -p actions-runner && tar xzf actions-runner.tar.gz -C actions-runner
-      args:
-        executable: /bin/bash
-      environment:
-        HOME: /home/github
+  vars:
+    runner_version: "2.325.0"
+    runner_user: github
+    runner_repo: "https://github.com/BrunoSantos88/chellenge-golang-quiz"
+    runner_token: "AV3UW2NQCPQVSBV3OHO7OGTIKBGJS"
+    runner_sha256: "5020da7139d85c776059f351e0de8fdec753affc9c558e892472d43ebeb518f4"
 
-    - name: Instalar dependências do runner
+  tasks:
+    # === INSTALAR NGINX ===
+    - name: Atualizar cache de pacotes
       apt:
-        name:
-          - libicu72
-          - libssl3
-          - curl
+        update_cache: yes
+      when: ansible_os_family == "Debian"
+
+    - name: Instalar NGINX
+      apt:
+        name: nginx
         state: present
       when: ansible_os_family == "Debian"
 
-    - name: Registrar runner no GitHub
-      become_user: github
-      shell: |
-        cd ~/actions-runner
-        ./config.sh --url https://github.com/SEU-USUARIO/SEU-REPO \
-                    --token SEU_TOKEN \
-                    --unattended \
-                    --name runner-ansible
-      args:
-        executable: /bin/bash
-      environment:
-        HOME: /home/github
+    - name: Iniciar e habilitar NGINX
+      service:
+        name: nginx
+        state: started
+        enabled: true
 
-    - name: Iniciar runner como serviço
-      become_user: github
+    - name: Copiar arquivos da pasta web para /var/www/html
+      copy:
+        src: ./web/
+        dest: /var/www/html/
+        owner: www-data
+        group: www-data
+        mode: '0755'
+
+    # === GITHUB ACTIONS RUNNER ===
+    - name: Criar usuário 'github' para o runner
+      user:
+        name: "{{ runner_user }}"
+        shell: /bin/bash
+        create_home: yes
+
+    - name: Criar diretório do runner
+      file:
+        path: "/home/{{ runner_user }}/actions-runner"
+        state: directory
+        owner: "{{ runner_user }}"
+        group: "{{ runner_user }}"
+
+    - name: Baixar GitHub Actions runner
+      become_user: "{{ runner_user }}"
+      get_url:
+        url: "https://github.com/actions/runner/releases/download/v{{ runner_version }}/actions-runner-linux-x64-{{ runner_version }}.tar.gz"
+        dest: "/home/{{ runner_user }}/actions-runner/actions-runner-linux-x64-{{ runner_version }}.tar.gz"
+
+    - name: Validar hash do runner
+      become_user: "{{ runner_user }}"
       shell: |
-        cd ~/actions-runner
-        sudo ./svc.sh install
-        sudo ./svc.sh start
+        echo "{{ runner_sha256 }}  actions-runner-linux-x64-{{ runner_version }}.tar.gz" | shasum -a 256 -c
       args:
-        executable: /bin/bash
-      environment:
-        HOME: /home/github
+        chdir: "/home/{{ runner_user }}/actions-runner"
+      register: sha_output
+      failed_when: "'OK' not in sha_output.stdout"
+
+    - name: Extrair runner
+      become_user: "{{ runner_user }}"
+      unarchive:
+        src: "actions-runner-linux-x64-{{ runner_version }}.tar.gz"
+        dest: "/home/{{ runner_user }}/actions-runner"
+        remote_src: yes
+
+    - name: Configurar runner
+      become_user: "{{ runner_user }}"
+      shell: |
+        ./config.sh --url {{ runner_repo }} --token {{ runner_token }} --unattended --name ansible-runner
+      args:
+        chdir: "/home/{{ runner_user }}/actions-runner"
+
+    - name: Executar runner em background
+      become_user: "{{ runner_user }}"
+      shell: |
+        nohup ./run.sh > runner.log 2>&1 &
+      args:
+        chdir: "/home/{{ runner_user }}/actions-runner"
