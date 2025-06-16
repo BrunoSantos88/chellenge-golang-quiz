@@ -1,0 +1,41 @@
+- name: Instalar e configurar Redis para conexões remotas
+  hosts: webservers
+  become: true
+
+  vars:
+    redis_password: ""   # deixa vazio para não usar senha
+
+  tasks:
+    - name: Atualizar cache de pacotes
+      apt:
+        update_cache: yes
+
+    - name: Instalar Redis server
+      apt:
+        name: redis-server
+        state: present
+
+    - name: Configurar Redis para escutar em todas interfaces
+      lineinfile:
+        path: /etc/redis/redis.conf
+        regexp: '^bind '
+        line: 'bind 0.0.0.0'
+
+    - name: Desabilitar modo protegido (protected-mode no)
+      lineinfile:
+        path: /etc/redis/redis.conf
+        regexp: '^protected-mode '
+        line: 'protected-mode no'
+
+    - name: Configurar senha para Redis (se variável definida)
+      lineinfile:
+        path: /etc/redis/redis.conf
+        regexp: '^# requirepass .*|^requirepass .*'
+        line: "requirepass {{ redis_password }}"
+      when: redis_password != ""
+
+    - name: Iniciar e habilitar Redis
+      service:
+        name: redis-server
+        state: started
+        enabled: true

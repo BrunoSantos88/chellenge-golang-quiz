@@ -1,27 +1,17 @@
 ---
-- name: Instalar NGINX, fazer deploy da pasta web e configurar GitHub Actions Runner
+- name: Instalar NGINX e fazer deploy da pasta web do repositório
   hosts: webservers
   become: true
 
-  vars:
-    runner_version: "2.325.0"
-    runner_user: github
-    runner_repo: "https://github.com/BrunoSantos88/chellenge-golang-quiz"
-    runner_token: "AV3UW2NQCPQVSBV3OHO7OGTIKBGJS"
-    runner_sha256: "5020da7139d85c776059f351e0de8fdec753affc9c558e892472d43ebeb518f4"
-
   tasks:
-    # === INSTALAR NGINX ===
     - name: Atualizar cache de pacotes
       apt:
         update_cache: yes
-      when: ansible_os_family == "Debian"
 
     - name: Instalar NGINX
       apt:
         name: nginx
         state: present
-      when: ansible_os_family == "Debian"
 
     - name: Iniciar e habilitar NGINX
       service:
@@ -29,60 +19,27 @@
         state: started
         enabled: true
 
-    - name: Copiar arquivos da pasta web para /var/www/html
-      copy:
-        src: ./web/
-        dest: /var/www/html/
+    - name: Instalar Git
+      apt:
+        name: git
+        state: present
+
+    - name: Clonar repositório com código web
+      git:
+        repo: https://github.com/BrunoSantos88/chellenge-golang-quiz
+        dest: /opt/chellenge-golang-quiz
+        version: main
+        force: yes
+
+    - name: Garantir que /var/www/html existe
+      file:
+        path: /var/www/html
+        state: directory
         owner: www-data
         group: www-data
         mode: '0755'
 
-    # === GITHUB ACTIONS RUNNER ===
-    - name: Criar usuário 'github' para o runner
-      user:
-        name: "{{ runner_user }}"
-        shell: /bin/bash
-        create_home: yes
-
-    - name: Criar diretório do runner
-      file:
-        path: "/home/{{ runner_user }}/actions-runner"
-        state: directory
-        owner: "{{ runner_user }}"
-        group: "{{ runner_user }}"
-
-    - name: Baixar GitHub Actions runner
-      become_user: "{{ runner_user }}"
-      get_url:
-        url: "https://github.com/actions/runner/releases/download/v{{ runner_version }}/actions-runner-linux-x64-{{ runner_version }}.tar.gz"
-        dest: "/home/{{ runner_user }}/actions-runner/actions-runner-linux-x64-{{ runner_version }}.tar.gz"
-
-    - name: Validar hash do runner
-      become_user: "{{ runner_user }}"
-      shell: |
-        echo "{{ runner_sha256 }}  actions-runner-linux-x64-{{ runner_version }}.tar.gz" | shasum -a 256 -c
+    - name: Mover conteúdo da pasta web para /var/www/html
+      shell: mv /opt/chellenge-golang-quiz/web/* /var/www/html/
       args:
-        chdir: "/home/{{ runner_user }}/actions-runner"
-      register: sha_output
-      failed_when: "'OK' not in sha_output.stdout"
-
-    - name: Extrair runner
-      become_user: "{{ runner_user }}"
-      unarchive:
-        src: "actions-runner-linux-x64-{{ runner_version }}.tar.gz"
-        dest: "/home/{{ runner_user }}/actions-runner"
-        remote_src: yes
-
-    - name: Configurar runner
-      become_user: "{{ runner_user }}"
-      shell: |
-        ./config.sh --url {{ runner_repo }} --token {{ runner_token }} --unattended --name ansible-runner
-      args:
-        chdir: "/home/{{ runner_user }}/actions-runner"
-
-    - name: Executar runner em background
-      become_user: "{{ runner_user }}"
-      shell: |
-        nohup ./run.sh > runner.log 2>&1 &
-      args:
-        chdir: "/home/{{ runner_user }}/actions-runner"
+        removes: /opt/chellenge-golang-quiz/web/*
